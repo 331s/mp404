@@ -25,12 +25,6 @@ if _cookie_b64:
     except Exception:
         pass
 
-EXTRACTOR_ARGS = {
-    'youtube': {
-        'player_client': ['ios', 'web'],
-    }
-}
-
 app = Flask(__name__)
 
 ALLOWED_QUALITIES = {'360', '480', '720', '1080', '1440', '2160'}
@@ -50,7 +44,6 @@ def info():
         'no_warnings': True,
         'skip_download': True,
         'ffmpeg_location': FFMPEG_PATH,
-        'extractor_args': EXTRACTOR_ARGS,
     }
     if COOKIE_FILE:
         ydl_opts['cookiefile'] = COOKIE_FILE
@@ -103,7 +96,6 @@ def download():
         'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
         'merge_output_format': 'mp4',
         'ffmpeg_location': FFMPEG_PATH,
-        'extractor_args': EXTRACTOR_ARGS,
         'postprocessors': [
             {'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'},
             {'key': 'FFmpegMetadata', 'add_metadata': True},
