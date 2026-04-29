@@ -113,58 +113,9 @@ mp404/
 
 > Boyutlar video codec, içerik türü ve sahne karmaşıklığına göre değişir.
 
----
-
-## ⚙️ Nasıl Çalışır?
-
-```
-YouTube URL
-    │
-    ▼
-/info endpoint → yt-dlp format listesini çeker (indirmeden)
-    │
-    ├─ 60fps stream var mı? → Evet: FPS butonu göster
-    │                       → Hayır: Sadece 30fps göster
-    ▼
-Kullanıcı çözünürlük + fps seçer
-    │
-    ▼
-yt-dlp → bestvideo[height<=X][fps<=Y] + bestaudio indirir
-    │
-    ▼
-FFmpeg → Ses ve videoyu MP4 konteynerinde birleştirir
-    │
-    ▼
-Flask → Dosyayı tarayıcıya gönderir (send_file)
-    │
-    ▼
-Tarayıcı → Otomatik indirir, sunucudan silinir
-```
 
 ---
 
-## 🔌 API Endpoint'leri
-
-| Method | Endpoint | Açıklama |
-|--------|----------|----------|
-| `GET`  | `/` | Ana sayfa |
-| `POST` | `/info` | Video format bilgisini döner (60fps kontrolü) |
-| `POST` | `/download` | Videoyu indir ve gönder |
-
-### `/info` — İstek / Yanıt
-
-```json
-// POST /info
-// body: url=https://youtube.com/watch?v=...
-
-// Yanıt
-{
-  "title": "Video Başlığı",
-  "has_60fps": true
-}
-```
-
----
 
 ## 🛠️ Teknolojiler
 
