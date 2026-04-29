@@ -29,6 +29,11 @@ def info():
         return jsonify({'error': 'URL gerekli'}), 400
 
     ydl_opts = {
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'web'],
+            }
+        },
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
@@ -90,6 +95,11 @@ def download():
                 'add_metadata': True,
             },
         ],
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'web'],
+            }
+        },
         'quiet': True,
         'no_warnings': True,
     }
@@ -195,6 +205,11 @@ def download():
                 'add_metadata': True,
             },
         ],
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'web'],
+            }
+        },
         'quiet': True,
         'no_warnings': True,
     }
