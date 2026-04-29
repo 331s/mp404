@@ -3,8 +3,9 @@ import yt_dlp
 import os
 import tempfile
 import glob
+import base64
 
-# FFmpeg yolunu belirle: önce sistem, yoksa imageio-ffmpeg
+# FFmpeg yolunu belirle
 def get_ffmpeg_path():
     try:
         import imageio_ffmpeg
@@ -13,6 +14,18 @@ def get_ffmpeg_path():
         return 'ffmpeg'
 
 FFMPEG_PATH = get_ffmpeg_path()
+
+# Cookie dosyasını Render env var'dan oluştur
+COOKIE_FILE = None
+_cookie_b64 = os.environ.get('YT_COOKIES_B64', '')
+if _cookie_b64:
+    try:
+        _cookie_path = os.path.join(tempfile.gettempdir(), 'yt_cookies.txt')
+        with open(_cookie_path, 'wb') as _f:
+            _f.write(base64.b64decode(_cookie_b64))
+        COOKIE_FILE = _cookie_path
+    except Exception:
+        pass
 
 EXTRACTOR_ARGS = {
     'youtube': {
@@ -41,6 +54,8 @@ def info():
         'ffmpeg_location': FFMPEG_PATH,
         'extractor_args': EXTRACTOR_ARGS,
     }
+    if COOKIE_FILE:
+        ydl_opts['cookiefile'] = COOKIE_FILE
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -101,6 +116,8 @@ def download():
         'quiet': True,
         'no_warnings': True,
     }
+    if COOKIE_FILE:
+        ydl_opts['cookiefile'] = COOKIE_FILE
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
