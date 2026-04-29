@@ -13,7 +13,9 @@
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
 <br>
-![MP331 Preview](https://i.imgur.com/pegKgov.png)
+
+![MP404 Preview](https://i.imgur.com/pegKgov.png)
+
 <br>
 
 </div>
