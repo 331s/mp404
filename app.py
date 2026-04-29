@@ -4,6 +4,13 @@ import os
 import tempfile
 import glob
 
+# Render gibi ortamlarda sistem FFmpeg yoksa imageio-ffmpeg'i kullan
+try:
+    import imageio_ffmpeg
+    os.environ.setdefault('FFMPEG_BINARY', imageio_ffmpeg.get_ffmpeg_exe())
+except ImportError:
+    pass
+
 app = Flask(__name__)
 
 ALLOWED_QUALITIES = {'360', '480', '720', '1080', '1440', '2160'}
