@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP404 — YouTube Video İndirici</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="bg-grid"></div>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="page-wrapper">
+
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <polygon points="5,3 19,12 5,21" fill="currentColor"/>
+                    </svg>
+                </span>
+                <span class="logo-text">
+                    <span class="logo-mp4">MP4</span><span class="logo-04">04</span>
+                </span>
+            </div>
+            <div class="header-badge" id="headerBadge">1080p 30fps • MP4</div>
+        </header>
+
+        <main class="hero">
+            <div class="hero-tag">YouTube → Video İndirici</div>
+
+            <h1 class="hero-title">
+                Her kalite,<br><em>tek tık.</em>
+            </h1>
+            <p class="hero-sub">YouTube linkini yapıştır, istediğin çözünürlükte videoyu indir.</p>
+
+            <!-- Film strip decoration -->
+            <div class="filmstrip" aria-hidden="true">
+                <div class="film-track">
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <!-- kopya — kesintisiz döngü için -->
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+
+            <div class="card">
+                <form id="downloadForm" action="/download" method="post">
+
+                    <div class="input-group">
+                        <div class="input-icon">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </div>
+                        <input
+                            type="text"
+                            name="url"
+                            id="urlInput"
+                            placeholder="https://youtube.com/watch?v=..."
+                            autocomplete="off"
+                            required
+                        >
+                        <button type="button" id="pasteBtn" class="paste-btn" title="Panodan yapıştır">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Quality Selector -->
+                    <div class="quality-section">
+                        <span class="quality-label">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                                <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+                                <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Çözünürlük
+                        </span>
+                        <div class="quality-options">
+                            <label class="quality-opt">
+                                <input type="radio" name="quality" value="360">
+                                <span>360<em>p</em></span>
+                            </label>
+                            <label class="quality-opt">
+                                <input type="radio" name="quality" value="480">
+                                <span>480<em>p</em></span>
+                            </label>
+                            <label class="quality-opt">
+                                <input type="radio" name="quality" value="720">
+                                <span>720<em>p</em> <b>HD</b></span>
+                            </label>
+                            <label class="quality-opt">
+                                <input type="radio" name="quality" value="1080" checked>
+                                <span>1080<em>p</em> <b>FHD</b></span>
+                            </label>
+                            <label class="quality-opt">
+                                <input type="radio" name="quality" value="1440">
+                                <span>1440<em>p</em> <b>2K</b></span>
+                            </label>
+                            <label class="quality-opt">
+                                <input type="radio" name="quality" value="2160">
+                                <span>2160<em>p</em> <b>4K</b></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- FPS Selector -->
+                    <div class="quality-section" id="fpsSection">
+                        <span class="quality-label">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Kare Hızı
+                        </span>
+                        <div class="quality-options">
+                            <label class="quality-opt">
+                                <input type="radio" name="fps" value="30" checked>
+                                <span>30<em>fps</em></span>
+                            </label>
+                            <label class="quality-opt" id="fps60Opt" style="display:none">
+                                <input type="radio" name="fps" value="60">
+                                <span>60<em>fps</em> <b>SMOOTH</b></span>
+                            </label>
+                            <span class="fps-checking" id="fpsChecking" style="display:none">
+                                <span class="fps-spinner"></span>kontrol ediliyor...
+                            </span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="download-btn" id="downloadBtn">
+                        <span class="btn-default">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <polyline points="7,10 12,15 17,10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Videoyu İndir
+                        </span>
+                        <span class="btn-loading">
+                            <span class="spinner"></span>
+                            İndiriliyor...
+                        </span>
+                    </button>
+                </form>
+
+                <div id="statusMsg" class="status-msg" hidden></div>
+            </div>
+
+            <div class="features">
+                <div class="feature">
+                    <span class="feature-icon">🎬</span>
+                    <span>MP4 format</span>
+                </div>
+                <div class="feature-divider"></div>
+                <div class="feature">
+                    <span class="feature-icon">📺</span>
+                    <span id="featQuality">1080p FHD</span>
+                </div>
+                <div class="feature-divider"></div>
+                <div class="feature">
+                    <span class="feature-icon">🔒</span>
+                    <span>Dosyalar saklanmaz</span>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>Kişisel kullanım için geliştirilmiştir • 331 Studios</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
