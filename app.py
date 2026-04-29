@@ -80,19 +80,9 @@ def download():
 
     temp_dir = tempfile.mkdtemp()
 
-    # Geniş format zinciri — en iyisinden en geniş fallback'e
-    fmt = (
-        f'bestvideo[height<={quality}][fps<={fps}][ext=mp4]+bestaudio[ext=m4a]'
-        f'/bestvideo[height<={quality}][fps<={fps}]+bestaudio'
-        f'/bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]'
-        f'/bestvideo[height<={quality}]+bestaudio'
-        f'/best[height<={quality}]'
-        f'/bestvideo+bestaudio'
-        f'/best'
-    )
-
     ydl_opts = {
-        'format': fmt,
+        'format': 'bestvideo+bestaudio/best',
+        'noplaylist': True,
         'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
         'merge_output_format': 'mp4',
         'ffmpeg_location': FFMPEG_PATH,
