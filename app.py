@@ -5,7 +5,6 @@ import tempfile
 import glob
 import base64
 
-# FFmpeg yolunu belirle
 def get_ffmpeg_path():
     try:
         import imageio_ffmpeg
@@ -15,7 +14,6 @@ def get_ffmpeg_path():
 
 FFMPEG_PATH = get_ffmpeg_path()
 
-# Cookie dosyasını Render env var'dan oluştur
 COOKIE_FILE = None
 _cookie_b64 = os.environ.get('YT_COOKIES_B64', '')
 if _cookie_b64:
@@ -61,9 +59,8 @@ def info():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             data = ydl.extract_info(url, download=False)
 
-        formats = data.get('formats', [])
         fps_values = set()
-        for f in formats:
+        for f in data.get('formats', []):
             fps = f.get('fps')
             if fps and f.get('vcodec') != 'none':
                 fps_values.add(int(fps))
@@ -79,39 +76,37 @@ def info():
 def download():
     url     = request.form.get('url', '').strip()
     quality = request.form.get('quality', '1080')
+    fps     = request.form.get('fps', '30')
 
     if not url:
         return "Lütfen bir YouTube linki girin.", 400
-
-    fps = request.form.get('fps', '30')
+    if quality not in ALLOWED_QUALITIES:
+        quality = '1080'
     if fps not in {'30', '60'}:
         fps = '30'
 
-    if quality not in ALLOWED_QUALITIES:
-        quality = '1080'
-
     temp_dir = tempfile.mkdtemp()
 
+    # Geniş format zinciri — en iyisinden en geniş fallback'e
+    fmt = (
+        f'bestvideo[height<={quality}][fps<={fps}][ext=mp4]+bestaudio[ext=m4a]'
+        f'/bestvideo[height<={quality}][fps<={fps}]+bestaudio'
+        f'/bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]'
+        f'/bestvideo[height<={quality}]+bestaudio'
+        f'/best[height<={quality}]'
+        f'/bestvideo+bestaudio'
+        f'/best'
+    )
+
     ydl_opts = {
-        'format': (
-            f'bestvideo[height<={quality}][fps<={fps}][ext=mp4]+bestaudio[ext=m4a]'
-            f'/bestvideo[height<={quality}][fps<={fps}]+bestaudio'
-            f'/bestvideo[height<={quality}]+bestaudio'
-            f'/best[height<={quality}]'
-        ),
+        'format': fmt,
         'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
         'merge_output_format': 'mp4',
         'ffmpeg_location': FFMPEG_PATH,
         'extractor_args': EXTRACTOR_ARGS,
         'postprocessors': [
-            {
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4',
-            },
-            {
-                'key': 'FFmpegMetadata',
-                'add_metadata': True,
-            },
+            {'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'},
+            {'key': 'FFmpegMetadata', 'add_metadata': True},
         ],
         'quiet': True,
         'no_warnings': True,
@@ -124,23 +119,22 @@ def download():
             info  = ydl.extract_info(url, download=True)
             title = info.get('title', 'video')
 
-        mp4_files = glob.glob(os.path.join(temp_dir, '*.mp4'))
-        if not mp4_files:
-            video_files = glob.glob(os.path.join(temp_dir, '*.mkv')) + \
-                          glob.glob(os.path.join(temp_dir, '*.webm'))
-            if not video_files:
-                return "Video dosyası oluşturulamadı.", 500
-            mp4_files = video_files
+        video_files = (
+            glob.glob(os.path.join(temp_dir, '*.mp4')) +
+            glob.glob(os.path.join(temp_dir, '*.mkv')) +
+            glob.glob(os.path.join(temp_dir, '*.webm'))
+        )
+        if not video_files:
+            return "Video dosyası oluşturulamadı.", 500
 
-        file_path = mp4_files[0]
+        file_path = video_files[0]
         ext = os.path.splitext(file_path)[1]
         safe_title = "".join(c for c in title if c.isalnum() or c in " _-()[]").strip() or "video"
-        download_name = f"{safe_title}{ext}"
 
         return send_file(
             file_path,
             as_attachment=True,
-            download_name=download_name,
+            download_name=f"{safe_title}{ext}",
             mimetype='video/mp4'
         )
 
