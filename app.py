@@ -1,129 +1,112 @@
 from flask import Flask, render_template, request, send_file, jsonify
-import yt_dlp
-import os
-import tempfile
-import glob
-import base64
+import os, tempfile, glob, base64, subprocess, sys, json
 
 def get_ffmpeg_path():
     try:
         import imageio_ffmpeg
         return imageio_ffmpeg.get_ffmpeg_exe()
     except ImportError:
-        return 'ffmpeg'
+        return "ffmpeg"
 
 FFMPEG_PATH = get_ffmpeg_path()
+YTDLP_PATH  = os.path.join(os.path.dirname(sys.executable), "yt-dlp")
+if not os.path.exists(YTDLP_PATH):
+    YTDLP_PATH = "yt-dlp"
 
 COOKIE_FILE = None
-_cookie_b64 = os.environ.get('YT_COOKIES_B64', '')
-if _cookie_b64:
+_b64 = os.environ.get("YT_COOKIES_B64", "")
+if _b64:
     try:
-        _cookie_path = os.path.join(tempfile.gettempdir(), 'yt_cookies.txt')
-        with open(_cookie_path, 'wb') as _f:
-            _f.write(base64.b64decode(_cookie_b64))
-        COOKIE_FILE = _cookie_path
-    except Exception:
-        pass
+        _path = os.path.join(tempfile.gettempdir(), "yt_cookies.txt")
+        with open(_path, "wb") as f:
+            f.write(base64.b64decode(_b64))
+        COOKIE_FILE = _path
+    except Exception as e:
+        print(f"Cookie hatasi: {e}")
 
+ALLOWED_QUALITIES = {"360", "480", "720", "1080", "1440", "2160"}
 app = Flask(__name__)
 
-ALLOWED_QUALITIES = {'360', '480', '720', '1080', '1440', '2160'}
-
-@app.route('/')
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route('/info', methods=['POST'])
+@app.route("/info", methods=["POST"])
 def info():
-    url = request.form.get('url', '').strip()
+    url = request.form.get("url", "").strip()
     if not url:
-        return jsonify({'error': 'URL gerekli'}), 400
+        return jsonify({"error": "URL gerekli"}), 400
 
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'skip_download': True,
-        'ffmpeg_location': FFMPEG_PATH,
-    }
+    cmd = [
+        YTDLP_PATH, "--no-playlist",
+        "--extractor-args", "youtube:player_client=web_creator,tv,mweb",
+        "-J", "--no-warnings",
+    ]
     if COOKIE_FILE:
-        ydl_opts['cookiefile'] = COOKIE_FILE
+        cmd += ["--cookies", COOKIE_FILE]
+    cmd.append(url)
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        return jsonify({"error": result.stderr[:200]}), 400
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            data = ydl.extract_info(url, download=False)
-
+        data = json.loads(result.stdout)
         fps_values = set()
-        for f in data.get('formats', []):
-            fps = f.get('fps')
-            if fps and f.get('vcodec') != 'none':
+        for f in data.get("formats", []):
+            fps = f.get("fps")
+            if fps and f.get("vcodec") not in (None, "none"):
                 fps_values.add(int(fps))
-
-        return jsonify({
-            'title': data.get('title', ''),
-            'has_60fps': any(f >= 60 for f in fps_values),
-        })
+        return jsonify({"title": data.get("title", ""), "has_60fps": any(f >= 60 for f in fps_values)})
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return jsonify({"error": str(e)}), 400
 
-@app.route('/download', methods=['POST'])
+@app.route("/download", methods=["POST"])
 def download():
-    url     = request.form.get('url', '').strip()
-    quality = request.form.get('quality', '1080')
-    fps     = request.form.get('fps', '30')
-
+    url     = request.form.get("url", "").strip()
+    quality = request.form.get("quality", "1080")
+    fps     = request.form.get("fps", "30")
     if not url:
-        return "Lütfen bir YouTube linki girin.", 400
+        return "Lutfen bir YouTube linki girin.", 400
     if quality not in ALLOWED_QUALITIES:
-        quality = '1080'
-    if fps not in {'30', '60'}:
-        fps = '30'
+        quality = "1080"
+    if fps not in {"30", "60"}:
+        fps = "30"
 
     temp_dir = tempfile.mkdtemp()
+    out_tmpl = os.path.join(temp_dir, "%(title)s.%(ext)s")
 
-    ydl_opts = {
-        'format': 'bestvideo+bestaudio/best',
-        'noplaylist': True,
-        'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
-        'merge_output_format': 'mp4',
-        'ffmpeg_location': FFMPEG_PATH,
-        'postprocessors': [
-            {'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'},
-            {'key': 'FFmpegMetadata', 'add_metadata': True},
-        ],
-        'quiet': True,
-        'no_warnings': True,
-    }
+    cmd = [
+        YTDLP_PATH,
+        "--no-playlist",
+        "--extractor-args", "youtube:player_client=web_creator,tv,mweb",
+        "-f", f"bestvideo[height<={quality}][fps<={fps}]+bestaudio/bestvideo[height<={quality}]+bestaudio/best",
+        "--merge-output-format", "mp4",
+        "--ffmpeg-location", FFMPEG_PATH,
+        "-o", out_tmpl,
+        "--no-warnings",
+    ]
     if COOKIE_FILE:
-        ydl_opts['cookiefile'] = COOKIE_FILE
+        cmd += ["--cookies", COOKIE_FILE]
+    cmd.append(url)
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info  = ydl.extract_info(url, download=True)
-            title = info.get('title', 'video')
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        return f"Hata: {result.stderr or result.stdout}", 400
 
-        video_files = (
-            glob.glob(os.path.join(temp_dir, '*.mp4')) +
-            glob.glob(os.path.join(temp_dir, '*.mkv')) +
-            glob.glob(os.path.join(temp_dir, '*.webm'))
-        )
-        if not video_files:
-            return "Video dosyası oluşturulamadı.", 500
+    video_files = (
+        glob.glob(os.path.join(temp_dir, "*.mp4")) +
+        glob.glob(os.path.join(temp_dir, "*.mkv")) +
+        glob.glob(os.path.join(temp_dir, "*.webm"))
+    )
+    if not video_files:
+        return f"Video olusturulamadi. Cikti: {result.stdout[:500]}", 500
 
-        file_path = video_files[0]
-        ext = os.path.splitext(file_path)[1]
-        safe_title = "".join(c for c in title if c.isalnum() or c in " _-()[]").strip() or "video"
+    file_path = video_files[0]
+    ext = os.path.splitext(file_path)[1]
+    title = os.path.splitext(os.path.basename(file_path))[0]
+    safe = "".join(c for c in title if c.isalnum() or c in " _-()[]").strip() or "video"
+    return send_file(file_path, as_attachment=True, download_name=f"{safe}{ext}", mimetype="video/mp4")
 
-        return send_file(
-            file_path,
-            as_attachment=True,
-            download_name=f"{safe_title}{ext}",
-            mimetype='video/mp4'
-        )
-
-    except yt_dlp.utils.DownloadError as e:
-        return f"İndirme hatası: {str(e)}", 400
-    except Exception as e:
-        return f"Beklenmedik bir hata: {str(e)}", 500
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
