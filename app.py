@@ -34,7 +34,6 @@ def base_cmd():
         YTDLP_PATH,
         "--no-playlist",
         "--js-runtimes", f"node:{NODE_PATH}" if NODE_PATH else "node",
-        "--remote-components", "ejs:github",
         "--no-warnings",
     ]
     if COOKIE_FILE:
