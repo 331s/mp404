@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request, Response, jsonify, stream_with_context
-import os, tempfile, base64, subprocess, sys, shutil, json
+from flask import Flask, render_template, request, Response, jsonify, send_file
+import os, tempfile, base64, subprocess, sys, shutil, json, glob
 
 def get_ffmpeg_path():
     try:
@@ -29,13 +29,14 @@ ALLOWED_QUALITIES = {"360", "480", "720", "1080", "1440", "2160"}
 app = Flask(__name__)
 
 def base_args():
-    args = [
-        "--js-runtimes", f"node:{NODE_PATH}" if NODE_PATH else "node",
-        "--no-warnings", "--no-playlist",
-    ]
+    args = ["--js-runtimes", f"node:{NODE_PATH}" if NODE_PATH else "node",
+            "--no-warnings", "--no-playlist"]
     if COOKIE_FILE:
         args += ["--cookies", COOKIE_FILE]
     return args
+
+def safe_filename(title):
+    return "".join(c for c in title if c.isalnum() or c in " _-()[]").strip() or "video"
 
 @app.route("/")
 def index():
@@ -52,7 +53,6 @@ def info():
     url = request.form.get("url", "").strip()
     if not url:
         return jsonify({"error": "URL gerekli"}), 400
-
     cmd = [YTDLP_PATH] + base_args() + ["-J", url]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     if r.returncode != 0:
@@ -67,14 +67,12 @@ def info():
         return jsonify({
             "title": data.get("title", ""),
             "has_60fps": any(f >= 60 for f in fps_values),
-            "duration": data.get("duration", 0),
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
 @app.route("/download", methods=["POST"])
 def download():
-    """Doğrudan stream: sunucuya kaydetmeden client'a gönder"""
     url     = request.form.get("url", "").strip()
     quality = request.form.get("quality", "1080")
     fps     = request.form.get("fps", "30")
@@ -85,56 +83,55 @@ def download():
     fmt = (
         f"bestvideo[height<={quality}][fps<={fps}][ext=mp4]+bestaudio[ext=m4a]"
         f"/bestvideo[height<={quality}][fps<={fps}]+bestaudio"
-        f"/bestvideo[height<={quality}]+bestaudio"
-        f"/best"
+        f"/bestvideo[height<={quality}]+bestaudio/best"
     )
 
-    # yt-dlp stdout'a yaz
+    temp_dir = tempfile.mkdtemp()
+    out_tmpl = os.path.join(temp_dir, "%(title)s.%(ext)s")
+
     cmd = [
-        YTDLP_PATH,
-        "-f", fmt,
+        YTDLP_PATH, "-f", fmt,
         "--no-playlist",
         "--js-runtimes", f"node:{NODE_PATH}" if NODE_PATH else "node",
-        "--no-warnings",
-        "--concurrent-fragments", "4",
-        "-o", "-",
-        "--quiet",
+        "--no-warnings", "--concurrent-fragments", "4",
+        "--merge-output-format", "mp4",
+        "--ffmpeg-location", FFMPEG_PATH,
+        "--add-metadata",          # başlık, sanatçı, yıl MP4'e gömülür
+        "--embed-thumbnail",       # thumbnail kapak resmi olarak gömülür
+        "-o", out_tmpl,
     ]
     if COOKIE_FILE:
         cmd += ["--cookies", COOKIE_FILE]
     cmd.append(url)
 
-    # ffmpeg ile mp4'e dönüştür, stdout'a yaz
-    ffmpeg_cmd = [
-        FFMPEG_PATH,
-        "-i", "pipe:0",
-        "-c:v", "copy",
-        "-c:a", "aac",
-        "-movflags", "frag_keyframe+empty_moov+faststart",
-        "-f", "mp4",
-        "pipe:1",
-    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
 
-    def generate():
-        yt = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        ff = subprocess.Popen(ffmpeg_cmd, stdin=yt.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        yt.stdout.close()
-        try:
+    files = glob.glob(os.path.join(temp_dir, "*.mp4")) + \
+            glob.glob(os.path.join(temp_dir, "*.mkv")) + \
+            glob.glob(os.path.join(temp_dir, "*.webm"))
+    if not files:
+        return f"Hata: {result.stderr or result.stdout}", 400
+
+    file_path = files[0]
+    ext  = os.path.splitext(file_path)[1]
+    name = os.path.splitext(os.path.basename(file_path))[0]
+    safe = safe_filename(name)
+
+    def stream_file():
+        with open(file_path, "rb") as f:
             while True:
-                chunk = ff.stdout.read(65536)
+                chunk = f.read(65536)
                 if not chunk:
                     break
                 yield chunk
-        finally:
-            ff.wait()
-            yt.wait()
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
     return Response(
-        stream_with_context(generate()),
+        stream_file(),
         mimetype="video/mp4",
         headers={
-            "Content-Disposition": "attachment; filename=video.mp4",
-            "X-Accel-Buffering": "no",
+            "Content-Disposition": f'attachment; filename="{safe}{ext}"',
+            "Content-Length": str(os.path.getsize(file_path)),
         }
     )
 
