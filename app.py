@@ -97,7 +97,6 @@ def download():
         "--merge-output-format", "mp4",
         "--ffmpeg-location", FFMPEG_PATH,
         "--add-metadata",          # başlık, sanatçı, yıl MP4'e gömülür
-        "--embed-thumbnail",       # thumbnail kapak resmi olarak gömülür
         "-o", out_tmpl,
     ]
     if COOKIE_FILE:
