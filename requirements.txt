@@ -1,4 +1,5 @@
 flask
 gunicorn
+gevent
 imageio-ffmpeg
 yt-dlp[default]
