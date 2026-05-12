@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, send_file, jsonify
-import os, tempfile, glob, base64, subprocess, sys, json
+import os, tempfile, glob, base64, subprocess, sys, json, shutil
 
 def get_ffmpeg_path():
     try:
@@ -12,6 +12,8 @@ FFMPEG_PATH = get_ffmpeg_path()
 YTDLP_PATH  = os.path.join(os.path.dirname(sys.executable), "yt-dlp")
 if not os.path.exists(YTDLP_PATH):
     YTDLP_PATH = "yt-dlp"
+
+NODE_PATH = shutil.which("node") or shutil.which("nodejs") or ""
 
 COOKIE_FILE = None
 _b64 = os.environ.get("YT_COOKIES_B64", "")
@@ -27,7 +29,17 @@ if _b64:
 ALLOWED_QUALITIES = {"360", "480", "720", "1080", "1440", "2160"}
 app = Flask(__name__)
 
-EXTRACTOR = "youtube:player_client=tv,mweb;formats=missing_pot"
+def base_cmd():
+    cmd = [
+        YTDLP_PATH,
+        "--no-playlist",
+        "--js-runtimes", f"node:{NODE_PATH}" if NODE_PATH else "node",
+        "--remote-components", "ejs:github",
+        "--no-warnings",
+    ]
+    if COOKIE_FILE:
+        cmd += ["--cookies", COOKIE_FILE]
+    return cmd
 
 @app.route("/")
 def index():
@@ -36,17 +48,14 @@ def index():
 @app.route("/version")
 def version():
     r = subprocess.run([YTDLP_PATH, "--version"], capture_output=True, text=True)
-    return jsonify({"yt_dlp": r.stdout.strip(), "ffmpeg": FFMPEG_PATH, "cookie": COOKIE_FILE is not None})
+    return jsonify({"yt_dlp": r.stdout.strip(), "ffmpeg": FFMPEG_PATH, "node": NODE_PATH, "cookie": COOKIE_FILE is not None})
 
 @app.route("/info", methods=["POST"])
 def info():
     url = request.form.get("url", "").strip()
     if not url:
         return jsonify({"error": "URL gerekli"}), 400
-    cmd = [YTDLP_PATH, "--no-playlist", "--extractor-args", EXTRACTOR, "-J", "--no-warnings"]
-    if COOKIE_FILE:
-        cmd += ["--cookies", COOKIE_FILE]
-    cmd.append(url)
+    cmd = base_cmd() + ["-J", url]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
         return jsonify({"error": result.stderr[:300]}), 400
@@ -69,18 +78,13 @@ def download():
     temp_dir = tempfile.mkdtemp()
     out_tmpl = os.path.join(temp_dir, "%(title)s.%(ext)s")
 
-    cmd = [
-        YTDLP_PATH, "--no-playlist",
-        "--extractor-args", EXTRACTOR,
+    cmd = base_cmd() + [
         "-f", f"bestvideo[height<={quality}][fps<={fps}]+bestaudio/bestvideo[height<={quality}]+bestaudio/best",
         "--merge-output-format", "mp4",
         "--ffmpeg-location", FFMPEG_PATH,
         "-o", out_tmpl,
-        "--no-warnings", "--ignore-errors",
+        url,
     ]
-    if COOKIE_FILE:
-        cmd += ["--cookies", COOKIE_FILE]
-    cmd.append(url)
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
 
